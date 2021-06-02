@@ -55,20 +55,6 @@ class Net(nn.Module):
         outputs = F.relu(outputs)
         outputs = self.hidden2rel(outputs)
         return outputs
-    
-    def SimplE(self, head, relation):
-        head = self.bn0(head)
-        head = self.ent_dropout(head)
-        relation = self.rel_dropout(relation)
-        s = head * relation
-        s_head, s_tail = torch.chunk(s, 2, dim=1)
-        s = torch.cat([s_tail, s_head], dim=1)
-        s = self.bn2(s)
-        s = self.score_dropout(s)
-        s = torch.mm(s, self.embedding.weight.transpose(1,0))
-        s = 0.5 * s
-        pred = torch.sigmoid(s)
-        return pred
 
     def ComplEx(self, head, relation):
         head = torch.stack(list(torch.chunk(head, 2, dim=1)), dim=1)
@@ -103,9 +89,9 @@ class Net(nn.Module):
         outputs, (hidden, cell_state) = self.GRU(packed_output)
         outputs, outputs_length = pad_packed_sequence(outputs, batch_first=True)
         outputs = torch.cat([hidden[0,:,:], hidden[1,:,:]], dim=-1)
-        rel_embedding = self.applyNonLinear(outputs)
+        rel_embedding = outputs # self.applyNonLinear(outputs)
         p_head = self.embedding(p_head)
-        pred = self.getScores(p_head, rel_embedding)
+        pred = self.ComplEx(p_head, rel_embedding) # self.getScores(p_head, rel_embedding)
         actual = p_tail
         if self.label_smoothing:
             actual = ((1.0-self.label_smoothing)*actual) + (1.0/actual.size(1)) 

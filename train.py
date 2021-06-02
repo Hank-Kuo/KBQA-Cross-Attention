@@ -14,6 +14,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils import data as torch_data
+from torch.optim.lr_scheduler import ExponentialLR
 
 parser = argparse.ArgumentParser(description='KBQA with LSTM PyTorch')
 parser.add_argument("--dataset_path", default="./data", help="Path to dataset.")
@@ -34,9 +35,8 @@ def main():
     test_dataset_path = os.path.join(path, "test/test.txt")
     entity_embedding_path = os.path.join(path, "pretrain/E.npy")
     relation_embedding_path = os.path.join(path, "pretrain/R.npy")
-    w_matrix_path = os.path.join(path, "W.npy")
-    entity_dict_path = os.path.join(path, "entities.dict")
-    relation_dict_path = os.path.join(path, "relations.dict")
+    entity_dict_path = os.path.join(path, "KB/entities.dict")
+    relation_dict_path = os.path.join(path, "KB/relations.dict")
     params_path = os.path.join(args.model_dir, 'params.json')
     
     # params
@@ -52,17 +52,17 @@ def main():
     # question text
     train_data = process_text_file(train_dataset_path, split=False)
     valid_data = process_text_file(valid_dataset_path)
-    word2ix, idx2word, max_len = get_vocab(data)
+    word2ix, idx2word, max_len = get_vocab(train_data)
     
     # data loader
-    dataset = MetaQADataset(data=train_data, word2ix=word2ix, relations=r, entities=e, entity2idx=entity2idx)
-    data_loader = MetaQADataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    dataset = data_loader.MetaQADataset(data=train_data, word2ix=word2ix, relations=r, entities=e, entity2idx=entity2idx)
+    data_generator = data_loader.MetaQADataLoader(dataset, batch_size=params.batch_size, shuffle=True)
     
     # net params
     model = net.Net(embedding_dim=params.embedding_dim, hidden_dim=params.hidden_dim, vocab_size=len(word2ix), 
-                    num_entities = len(idx2entity), relation_dim=params.relation_dim, device=params.device, e
-                    ntdrop = params.entdrop, reldrop = params.reldrop, scoredrop = params.scoredrop, l3_reg = params.l3_reg, 
-                    model = model_name, label_smoothing = params.label_smoothing, w_matrix = w_matrix, bn_list=bn_list, pretrained_embeddings=embedding_matrix)
+                    num_entities = len(idx2entity), relation_dim=params.relation_dim, device=params.device, 
+                    entdrop = params.entdrop, reldrop = params.reldrop, scoredrop = params.scoredrop,
+                    pretrained_embeddings=embedding_matrix)
     model.to(params.device)
     optimizer = torch.optim.Adam(model.parameters(), lr=params.learning_rate)
     scheduler = ExponentialLR(optimizer, params.decay)
@@ -71,7 +71,6 @@ def main():
     best_model = model.state_dict()
     no_update = 0
 
-    # print("KB: entity: {} relation: {} triples: {}".format(len(entity2idx), len(relation2id), len(train_set)))
     print(model)
 
     for epoch_id in range(params.epochs):
@@ -80,7 +79,7 @@ def main():
 
         model.train()
         running_loss = 0
-        with tqdm(total=len(data_loader)) as t:
+        with tqdm(total=len(data_generator)) as t:
             for i_batch, a in enumerate(data_generator):
                 model.zero_grad()
                 question = a[0].to(params.device)
@@ -92,8 +91,8 @@ def main():
                 loss.backward()
                 optimizer.step()
                 running_loss += loss.item()
-                loader.set_postfix(loss=running_loss/((i_batch+1)*params.batch_size))
-                loader.update()
+                t.set_postfix(loss=running_loss/((i_batch+1)*params.batch_size))
+                t.update()
             scheduler.step()
             
             # valid mod
@@ -108,19 +107,18 @@ def main():
                     no_update = 0
                     best_model = model.state_dict()
                     print('Test score for best valid so far:', best_score)
-                    utils.save_checkpoint(checkpoint_dir, model, optimizer, epoch_id, step, best_score)
-
-                elif (score < best_score + eps) and (no_update < patience):
+                    # utils.save_checkpoint(checkpoint_dir, model, optimizer, epoch_id, best_score)
+                elif (score < best_score + eps) and (no_update < params.patience):
                     no_update +=1
-                    print("Validation accuracy decreases to %f from %f, %d more epoch to check"%(score, best_score, patience-no_update))
+                    print("Validation accuracy decreases to %f from %f, %d more epoch to check"%(score, best_score, params.patience-no_update))
                 elif no_update == patience:
                     # early stopping
                     print("Model has exceed patience. Saving best model and exiting")
-                    utils.save_checkpoint(checkpoint_dir, model, optimizer, epoch_id, best_score)
+                    # utils.save_checkpoint(checkpoint_dir, model, optimizer, epoch_id, best_score)
                     exit()
                 if epoch_id == nb_epochs-1:
                     print("Final Epoch has reached. Stopping and saving model.")
-                    utils.save_checkpoint(checkpoint_dir, model, optimizer, epoch_id, best_score)
+                    # utils.save_checkpoint(checkpoint_dir, model, optimizer, epoch_id, best_score)
                     exit()
 
 
