@@ -10,8 +10,6 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-
-
 class MetaQADataset(Dataset):
     def __init__(self, data, word2ix, relations, entities, entity2idx):
         self.data = data
@@ -29,7 +27,6 @@ class MetaQADataset(Dataset):
 
     def toOneHot(self, indices):
         indices = torch.LongTensor(indices)
-        batch_size = len(indices)
         vec_len = len(self.entity2idx)
         one_hot = torch.FloatTensor(vec_len)
         one_hot.zero_()
@@ -40,7 +37,7 @@ class MetaQADataset(Dataset):
         data_point = self.data[index]
         question_text = data_point[1]
         question_ids = [self.word_to_ix[word] for word in question_text.split()]
-        head_id = self.entity2idx[data_point[0].strip()]
+        head_id = self.entity2idx[data_point[0].strip()] 
         tail_ids = []
         for tail_name in data_point[2]:
             tail_name = tail_name.strip()
@@ -61,18 +58,23 @@ def _collate_fn(batch):
         sample = sorted_seq[x][0]
         p_head.append(sorted_seq[x][1])
         tail_onehot = sorted_seq[x][2]
+        """
+        p_tail.append(sorted_seq[x][2])
+        neg_tail.append(sorted_seq[x][3])
+        """
         p_tail.append(tail_onehot)
         seq_len = len(sample)
         input_lengths.append(seq_len)
         sample = torch.tensor(sample, dtype=torch.long)
         sample = sample.view(sample.shape[0])
         inputs[x].narrow(0,0,seq_len).copy_(sample)
+    # print(input.size())
 
-    return inputs, torch.tensor(input_lengths, dtype=torch.long), torch.tensor(p_head, dtype=torch.long), torch.stack(p_tail)
+    return inputs, torch.tensor(input_lengths, dtype=torch.long), torch.tensor(p_head, dtype=torch.long), torch.stack(p_tail) # torch.tensor(p_tail, dtype=torch.long) torch.tensor(neg_tail, dtype=torch.long)
 
 class MetaQADataLoader(DataLoader):
     def __init__(self, *args, **kwargs):
-        super(DataLoaderMetaQA, self).__init__(*args, **kwargs)
+        super(MetaQADataLoader, self).__init__(*args, **kwargs)
         self.collate_fn = _collate_fn
 
 

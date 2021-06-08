@@ -1,6 +1,6 @@
 import argparse
-import os, sys
-import time
+import os
+import logging
 import numpy as np
 from tqdm import tqdm
 
@@ -24,7 +24,6 @@ def main():
     args = parser.parse_args()
 
     # torch setting
-    torch.random.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     
@@ -37,17 +36,24 @@ def main():
     relation_embedding_path = os.path.join(path, "pretrain/R.npy")
     entity_dict_path = os.path.join(path, "KB/entities.dict")
     relation_dict_path = os.path.join(path, "KB/relations.dict")
+    checkpoint_dir = os.path.join(args.model_dir, "checkpoint")
     params_path = os.path.join(args.model_dir, 'params.json')
     
     # params
+    utils.set_logger(os.path.join(args.model_dir, 'train.log'))
     params = utils.Params(params_path)
     params.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
     # KB
+    logging.info("Loading KB datasets...")
     entities = np.load(entity_embedding_path)
     relations = np.load(relation_embedding_path)
     e, r = process_KB(entity_dict_path, relation_dict_path, entities, relations)
     entity2idx, idx2entity, embedding_matrix = prepare_embeddings(e)
+    bn_list = []
+    for i in range(3):
+        bn = np.load(os.path.join(path, "pretrain/bn"+ str(i) + '.npy'), allow_pickle=True)
+        bn_list.append(bn.item())
     
     # question text
     train_data = process_text_file(train_dataset_path, split=False)
@@ -55,6 +61,7 @@ def main():
     word2ix, idx2word, max_len = get_vocab(train_data)
     
     # data loader
+    logging.info("Loading QA datasets...")
     dataset = data_loader.MetaQADataset(data=train_data, word2ix=word2ix, relations=r, entities=e, entity2idx=entity2idx)
     data_generator = data_loader.MetaQADataLoader(dataset, batch_size=params.batch_size, shuffle=True)
     
@@ -62,17 +69,21 @@ def main():
     model = net.Net(embedding_dim=params.embedding_dim, hidden_dim=params.hidden_dim, vocab_size=len(word2ix), 
                     num_entities = len(idx2entity), relation_dim=params.relation_dim, device=params.device, 
                     entdrop = params.entdrop, reldrop = params.reldrop, scoredrop = params.scoredrop,
-                    pretrained_embeddings=embedding_matrix)
+                    pretrained_embeddings=embedding_matrix, bn_list=bn_list)
     model.to(params.device)
     optimizer = torch.optim.Adam(model.parameters(), lr=params.learning_rate)
     scheduler = ExponentialLR(optimizer, params.decay)
     optimizer.zero_grad()
     best_score = -float("inf")
-    best_model = model.state_dict()
     no_update = 0
 
+    print("Number of KB's Entity: {}, Number of KB's Relation : {}".format(len(e), len(r)))
+    print("PreTrain KB's Entity size: {}, PreTrain KB's Relation size: {}".format(entities.shape, relations.shape))
+    print("Number of Vocab: {}, Max length word: {}".format(len(word2ix), max_len))
+    print("Number of Train dataset: {}, Number of Valild dataset: {}".format(len(train_data), len(valid_data)))
     print(model)
 
+    logging.info("Starting training...")
     for epoch_id in range(params.epochs):
         # train mod
         print("Epoch {}/{}".format(epoch_id, params.epochs))
@@ -83,7 +94,7 @@ def main():
             for i_batch, a in enumerate(data_generator):
                 model.zero_grad()
                 question = a[0].to(params.device)
-                sent_len = a[1].to(params.device)
+                sent_len = a[1]#.to(params.device)
                 positive_head = a[2].to(params.device)
                 positive_tail = a[3].to(params.device)                    
 
@@ -99,29 +110,27 @@ def main():
             if epoch_id % params.valid_every == 0 :
                 model.eval()
                 eps = 0.0001
-                answers, score = evaluate(model=model, data= valid_data, word2idx= word2ix, entity2idx= entity2idx, 
+                answers, score = evaluate(model=model, data=valid_data, word2idx=word2ix, entity2idx= entity2idx, 
                                         device=params.device)
+                logging.info("- Eval metrics: {}".format(score))
                 if score > best_score + eps:
                     # update 
                     best_score = score
                     no_update = 0
-                    best_model = model.state_dict()
-                    print('Test score for best valid so far:', best_score)
-                    # utils.save_checkpoint(checkpoint_dir, model, optimizer, epoch_id, best_score)
+                    logging.info("- Test score for best valid so far {}".format(best_score))
+                    utils.save_checkpoint(checkpoint_dir, model, optimizer, epoch_id, best_score)
                 elif (score < best_score + eps) and (no_update < params.patience):
                     no_update +=1
-                    print("Validation accuracy decreases to %f from %f, %d more epoch to check"%(score, best_score, params.patience-no_update))
-                elif no_update == patience:
+                    logging.info("- Validation accuracy decreases to {} from {}, {} more epoch to check".format(score, best_score, params.patience-no_update))
+                elif no_update == params.patience:
                     # early stopping
-                    print("Model has exceed patience. Saving best model and exiting")
-                    # utils.save_checkpoint(checkpoint_dir, model, optimizer, epoch_id, best_score)
+                    logging.info("- Model has exceed patience. Saving best model and exiting")
+                    utils.save_checkpoint(checkpoint_dir, model, optimizer, epoch_id, best_score)
                     exit()
-                if epoch_id == nb_epochs-1:
-                    print("Final Epoch has reached. Stopping and saving model.")
-                    # utils.save_checkpoint(checkpoint_dir, model, optimizer, epoch_id, best_score)
+                if epoch_id == params.epochs -1:
+                    logging.info("- Final Epoch has reached. Stopping and saving model")
+                    utils.save_checkpoint(checkpoint_dir, model, optimizer, epoch_id, best_score)
                     exit()
 
-
-
-if __name__=='__init__':
+if __name__=='__main__':
     main()

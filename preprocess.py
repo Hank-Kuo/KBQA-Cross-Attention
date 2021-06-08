@@ -1,3 +1,7 @@
+
+############################################
+################### KB #####################
+############################################
 def prepare_embeddings(embedding_dict):
     entity2idx = {}
     idx2entity = {}
@@ -10,6 +14,32 @@ def prepare_embeddings(embedding_dict):
         embedding_matrix.append(entity)
     return entity2idx, idx2entity, embedding_matrix
 
+def process_KB(entity_dict_path, relation_dict_path, entities, relations):
+    """
+        return {[name]:id}, {[name]:id}
+    """
+    e = {}
+    r = {}
+    f = open(entity_dict_path, 'r', encoding='utf-8')
+    for line in f:
+        line = line.strip().split('\t')
+        ent_id = int(line[1])
+        ent_name = line[0]
+        e[ent_name] = entities[ent_id]
+    f.close()
+    f = open(relation_dict_path,'r', encoding='utf-8')
+    for line in f:
+        line = line.strip().split('\t')
+        rel_id = int(line[1])
+        rel_name = line[0]
+        r[rel_name] = relations[rel_id]
+    f.close()
+    return e,r
+
+
+############################################
+################## Text ####################
+############################################
 def get_vocab(data): 
     # sentence, 
     word_to_ix = {}
@@ -26,32 +56,11 @@ def get_vocab(data):
             maxLength = length
     return word_to_ix, idx2word, maxLength
  
-def process_KB(entity_dict_path, relation_dict_path, entities, relations):
-    """
-        return {[name]:id}, {[name]:id}
-    """
-    e = {}
-    r = {}
-
-    f = open(entity_dict_path, 'r')
-    for line in f:
-        line = line.strip().split('\t')
-        ent_id = int(line[0])
-        ent_name = line[1]
-        e[ent_name] = entities[ent_id]
-    f.close()
-
-    f = open(relation_dict_path,'r')
-    for line in f:
-        line = line.strip().split('\t')
-        rel_id = int(line[0])
-        rel_name = line[1]
-        r[rel_name] = relations[rel_id]
-    f.close()
-    return e,r
-
 def process_text_file(text_file_path, split=False):
-    data_file = open(text_file_path, 'r')
+    """
+        return head_name, question, answer_name
+    """
+    data_file = open(text_file_path, 'r', encoding='utf-8')
     data_array = []
     for data_line in data_file.readlines():
         data_line = data_line.strip()
@@ -65,6 +74,10 @@ def process_text_file(text_file_path, split=False):
         question_2 = question_2[1]
         question = question_1+'NE'+question_2
         ans = data_line[1].split('|')
+        """
+        for ans_name in ans:
+            data_array.append([head, question.strip(), ans_name, ])    
+        """
         data_array.append([head, question.strip(), ans])
     if split==False:
         return data_array

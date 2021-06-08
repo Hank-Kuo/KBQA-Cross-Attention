@@ -1,0 +1,18 @@
+{
+    "learning_rate": 0.0005 ,
+    "batch_size": 128,
+    "l3_reg": 0.0,
+    "decay": 1.0,
+    "label_smoothing": 0.0,
+
+    "head_dropout": 0.3, 
+    "relation_dropout": 0.4, 
+    "score_dropout": 0.5, 
+    
+
+    "dim": 200,
+        
+    "epochs": 100,
+    "valid_every": 5
+    
+}
