@@ -37,8 +37,6 @@ class Params():
         """Gives dict-like access to Params instance by `params.dict['learning_rate']"""
         return self.__dict__
 
-
-
 def set_logger(log_path):
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
@@ -53,8 +51,6 @@ def set_logger(log_path):
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(logging.Formatter('%(message)s'))
         logger.addHandler(stream_handler)
-
-
 
 def load_checkpoint(checkpoint_dir: str, model: nn.Module, optim: optimizer.Optimizer) -> Tuple[int, int, float]:
     """Loads training checkpoint.
@@ -91,61 +87,61 @@ def save_checkpoint(checkpoint_dir: str, model: nn.Module, optim: optimizer.Opti
 
 
 def write_embedding_files(self, output_dir, model):
-        model.eval()
-        model_folder = f"../kg_embeddings/{self.model}/{self.dataset}" 
-        data_folder = "../data/%s/" % self.dataset
-        embedding_type = self.model
-        if(not os.path.exists(model_folder)):
-            os.makedirs(model_folder)
-        R_numpy = model.R.weight.data.cpu().numpy()
-        E_numpy = model.E.weight.data.cpu().numpy()
-        bn_list = []
-        for bn in [model.bn0, model.bn1, model.bn2]:
-            bn_weight = bn.weight.data.cpu().numpy()
-            bn_bias = bn.bias.data.cpu().numpy()
-            bn_running_mean = bn.running_mean.data.cpu().numpy()
-            bn_running_var = bn.running_var.data.cpu().numpy()
-            bn_numpy = {}
-            bn_numpy['weight'] = bn_weight
-            bn_numpy['bias'] = bn_bias
-            bn_numpy['running_mean'] = bn_running_mean
-            bn_numpy['running_var'] = bn_running_var
-            bn_list.append(bn_numpy)
-            
-        if embedding_type == 'TuckER':
-            W_numpy = model.W.detach().cpu().numpy()
-            
-        np.save(model_folder +'/E.npy', E_numpy)
-        np.save(model_folder +'/R.npy', R_numpy)
-        for i, bn in enumerate(bn_list):
-            np.save(model_folder + '/bn' + str(i) + '.npy', bn)
+    model.eval()
+    model_folder = f"../kg_embeddings/{self.model}/{self.dataset}" 
+    data_folder = "../data/%s/" % self.dataset
+    embedding_type = self.model
+    if(not os.path.exists(model_folder)):
+        os.makedirs(model_folder)
+    R_numpy = model.R.weight.data.cpu().numpy()
+    E_numpy = model.E.weight.data.cpu().numpy()
+    bn_list = []
+    for bn in [model.bn0, model.bn1, model.bn2]:
+        bn_weight = bn.weight.data.cpu().numpy()
+        bn_bias = bn.bias.data.cpu().numpy()
+        bn_running_mean = bn.running_mean.data.cpu().numpy()
+        bn_running_var = bn.running_var.data.cpu().numpy()
+        bn_numpy = {}
+        bn_numpy['weight'] = bn_weight
+        bn_numpy['bias'] = bn_bias
+        bn_numpy['running_mean'] = bn_running_mean
+        bn_numpy['running_var'] = bn_running_var
+        bn_list.append(bn_numpy)
+        
+    if embedding_type == 'TuckER':
+        W_numpy = model.W.detach().cpu().numpy()
+        
+    np.save(model_folder +'/E.npy', E_numpy)
+    np.save(model_folder +'/R.npy', R_numpy)
+    for i, bn in enumerate(bn_list):
+        np.save(model_folder + '/bn' + str(i) + '.npy', bn)
 
-        if embedding_type == 'TuckER':
-            np.save(model_folder +'/W.npy', W_numpy)
+    if embedding_type == 'TuckER':
+        np.save(model_folder +'/W.npy', W_numpy)
 
-        f = open(data_folder + '/entities.dict', 'r')
-        f2 = open(model_folder + '/entities.dict', 'w')
-        ents = {}
-        idx2ent = {}
-        for line in f:
-            line = line.rstrip().split('\t')
-            name = line[0]
-            id = int(line[1])
-            ents[name] = id
-            idx2ent[id] = name
-            f2.write(str(id) + '\t' + name + '\n')
-        f.close()
-        f2.close()
-        f = open(data_folder + '/relations.dict', 'r')
-        f2 = open(model_folder + '/relations.dict', 'w')
-        rels = {}
-        idx2rel = {}
-        for line in f:
-            line = line.strip().split('\t')
-            name = line[0]
-            id = int(line[1])
-            rels[name] = id
-            idx2rel[id] = name
-            f2.write(str(id) + '\t' + name + '\n')
-        f.close()
-        f2.close()
+    f = open(data_folder + '/entities.dict', 'r')
+    f2 = open(model_folder + '/entities.dict', 'w')
+    ents = {}
+    idx2ent = {}
+    for line in f:
+        line = line.rstrip().split('\t')
+        name = line[0]
+        id = int(line[1])
+        ents[name] = id
+        idx2ent[id] = name
+        f2.write(str(id) + '\t' + name + '\n')
+    f.close()
+    f2.close()
+    f = open(data_folder + '/relations.dict', 'r')
+    f2 = open(model_folder + '/relations.dict', 'w')
+    rels = {}
+    idx2rel = {}
+    for line in f:
+        line = line.strip().split('\t')
+        name = line[0]
+        id = int(line[1])
+        rels[name] = id
+        idx2rel[id] = name
+        f2.write(str(id) + '\t' + name + '\n')
+    f.close()
+    f2.close()

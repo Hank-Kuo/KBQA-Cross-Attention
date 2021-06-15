@@ -37,12 +37,14 @@ def main():
     params.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
     # dataset
+    print("Process entities and relations in KB")
     train_data = data_loader.load_data(train_path, reverse=True)
     test_data = data_loader.load_data(test_path, reverse=True)
     valid_data = data_loader.load_data(validation_path, reverse=True)
-    entity2id, relation2id = data_loader.create_mappings(train_path, valid_data, test_path)
+    entity2id, relation2id = data_loader.create_mappings(train_path, valid_data, test_path, path)
 
     # dataset
+    print("Process dataset...")
     train_set = data_loader.Dataset(train_data, entity2id, relation2id)
     train_generator = torch_data.DataLoader(train_set, batch_size=params.batch_size)
     validation_set = data_loader.Dataset(valid_data, entity2id, relation2id)

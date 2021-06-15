@@ -8,10 +8,8 @@
     "head_dropout": 0.3, 
     "relation_dropout": 0.4, 
     "score_dropout": 0.5, 
-    
-
     "dim": 200,
-        
+
     "epochs": 100,
     "valid_every": 5
     
