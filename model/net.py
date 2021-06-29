@@ -22,9 +22,9 @@ class Net(nn.Module):
         self.bidirectional = True
         self.num_entities = num_entities
 
-        self.ent_dropout = torch.nn.Dropout(entdrop)
-        self.rel_dropout = torch.nn.Dropout(reldrop)
-        self.score_dropout = torch.nn.Dropout(scoredrop)
+        #self.ent_dropout = torch.nn.Dropout(entdrop)
+        #self.rel_dropout = torch.nn.Dropout(reldrop)
+        #self.score_dropout = torch.nn.Dropout(scoredrop)
 
         self.word_embeddings = nn.Embedding(vocab_size, embedding_dim)
         self.GRU = nn.LSTM(embedding_dim, self.hidden_dim, self.n_layers, 
@@ -32,30 +32,12 @@ class Net(nn.Module):
         # KB embedding                             
         self.KB_embedding = nn.Embedding.from_pretrained(torch.FloatTensor(pretrained_embeddings), freeze=True)
         self.loss = torch.nn.BCELoss(reduction='sum')
-        self.criterion = nn.MarginRankingLoss(margin=1, reduction='none')
-        
-        self.bn0 = torch.nn.BatchNorm1d(multiplier)
-        self.bn2 = torch.nn.BatchNorm1d(multiplier)
-
-        for i in range(3):
-            for key, value in self.bn_list[i].items():
-                self.bn_list[i][key] = torch.Tensor(value).to(device)
-
-        self.bn0.weight.data = self.bn_list[0]['weight']
-        self.bn0.bias.data = self.bn_list[0]['bias']
-        self.bn0.running_mean.data = self.bn_list[0]['running_mean']
-        self.bn0.running_var.data = self.bn_list[0]['running_var']
-
-        self.bn2.weight.data = self.bn_list[2]['weight']
-        self.bn2.bias.data = self.bn_list[2]['bias']
-        self.bn2.running_mean.data = self.bn_list[2]['running_mean']
-        self.bn2.running_var.data = self.bn_list[2]['running_var']
 
     def ComplEx(self, head, relation):
         head = torch.stack(list(torch.chunk(head, 2, dim=1)), dim=1)
-        head = self.bn0(head)
-        head = self.ent_dropout(head)
-        relation = self.rel_dropout(relation)
+        
+        # head = self.ent_dropout(head)
+        # relation = self.rel_dropout(relation)
         head = head.permute(1, 0, 2)
         re_head = head[0]
         im_head = head[1]
@@ -67,8 +49,8 @@ class Net(nn.Module):
         im_score = re_head * im_relation + im_head * re_relation
 
         score = torch.stack([re_score, im_score], dim=1)
-        score = self.bn2(score)
-        score = self.score_dropout(score)
+        
+        # score = self.score_dropout(score)
         score = score.permute(1, 0, 2)
 
         re_score = score[0]

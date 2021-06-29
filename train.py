@@ -29,13 +29,11 @@ def main():
     
     # path setting
     path = args.dataset_path
-    train_dataset_path = os.path.join(path, "train/train.txt")
-    valid_dataset_path = os.path.join(path, "valid/valid.txt")
-    test_dataset_path = os.path.join(path, "test/test.txt")
-    entity_embedding_path = os.path.join(path, "pretrain/E.npy")
-    relation_embedding_path = os.path.join(path, "pretrain/R.npy")
-    entity_dict_path = os.path.join(path, "KB/entities.dict")
-    relation_dict_path = os.path.join(path, "KB/relations.dict")
+    train_dataset_path = os.path.join(path, "train/train.json")
+    valid_dataset_path = os.path.join(path, "valid/valid.json")
+    test_dataset_path = os.path.join(path, "test/test.json")
+    entity_dict_path = os.path.join(path, "KB/entities.json")
+    relation_dict_path = os.path.join(path, "KB/relations.json")
     checkpoint_dir = os.path.join(args.model_dir, "checkpoint")
     params_path = os.path.join(args.model_dir, 'params.json')
     
@@ -46,14 +44,8 @@ def main():
 
     # KB
     logging.info("Loading KB datasets...")
-    entities = np.load(entity_embedding_path)
-    relations = np.load(relation_embedding_path)
-    e, r = process_KB(entity_dict_path, relation_dict_path, entities, relations)
+    
     entity2idx, idx2entity, embedding_matrix = prepare_embeddings(e)
-    bn_list = []
-    for i in range(3):
-        bn = np.load(os.path.join(path, "pretrain/bn"+ str(i) + '.npy'), allow_pickle=True)
-        bn_list.append(bn.item())
     
     # question text
     train_data = process_text_file(train_dataset_path, split=False)
@@ -69,22 +61,23 @@ def main():
     model = net.Net(embedding_dim=params.embedding_dim, hidden_dim=params.hidden_dim, vocab_size=len(word2ix), 
                     num_entities = len(idx2entity), relation_dim=params.relation_dim, device=params.device, 
                     entdrop = params.entdrop, reldrop = params.reldrop, scoredrop = params.scoredrop,
-                    pretrained_embeddings=embedding_matrix, bn_list=bn_list)
+                    pretrained_embeddings=embedding_matrix)
     model.to(params.device)
     optimizer = torch.optim.Adam(model.parameters(), lr=params.learning_rate)
     scheduler = ExponentialLR(optimizer, params.decay)
     optimizer.zero_grad()
     best_score = -float("inf")
     no_update = 0
-
-    print("Number of KB's Entity: {}, Number of KB's Relation : {}".format(len(e), len(r)))
-    print("PreTrain KB's Entity size: {}, PreTrain KB's Relation size: {}".format(entities.shape, relations.shape))
-    print("Number of Vocab: {}, Max length word: {}".format(len(word2ix), max_len))
-    print("Number of Train dataset: {}, Number of Valild dataset: {}".format(len(train_data), len(valid_data)))
+    
+    logging.info('----------------------------------------------')
+    logging.info("Number of KB's Entity: {}, Number of KB's Relation : {}".format(len(e), len(r)))
+    logging.info("PreTrain KB's Entity size: {}, PreTrain KB's Relation size: {}".format(entities.shape, relations.shape))
+    logging.info("Number of Vocab: {}, Max length word: {}".format(len(word2ix), max_len))
+    logging.info("Number of Train dataset: {}, Number of Valild dataset: {}".format(len(train_data), len(valid_data)))
     print(model)
 
     logging.info("Starting training...")
-    for epoch_id in range(params.epochs):
+    for epoch_id in range(1, params.epochs):
         # train mod
         print("Epoch {}/{}".format(epoch_id, params.epochs))
 
@@ -94,7 +87,7 @@ def main():
             for i_batch, a in enumerate(data_generator):
                 model.zero_grad()
                 question = a[0].to(params.device)
-                sent_len = a[1]#.to(params.device)
+                sent_len = a[1]
                 positive_head = a[2].to(params.device)
                 positive_tail = a[3].to(params.device)                    
 

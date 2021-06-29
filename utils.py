@@ -1,11 +1,15 @@
 import logging
 import json 
 import os
+import re
 
 import torch
 from torch import nn
 from torch.optim import optimizer
 from typing import Tuple
+import numpy as np 
+from nltk.tokenize import wordpunct_tokenize
+
 
 _MODEL_STATE_DICT = "model_state_dict"
 _OPTIMIZER_STATE_DICT = "optimizer_state_dict"
@@ -37,8 +41,6 @@ class Params():
         """Gives dict-like access to Params instance by `params.dict['learning_rate']"""
         return self.__dict__
 
-
-
 def set_logger(log_path):
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
@@ -55,15 +57,89 @@ def set_logger(log_path):
         logger.addHandler(stream_handler)
 
 
+tokenize = lambda s: wordpunct_tokenize(re.sub('[%s]' % re.escape(string.punctuation), ' ', s))
 
+
+
+########################################
+################ Numpy #################
+########################################
+def dump_ndarray(data, path_to_file):
+    try:
+        with open(path_to_file, 'wb') as f:
+            np.save(f, data)
+    except Exception as e:
+        raise e
+
+
+########################################
+########### Array/Dict/Json ############
+########################################
+def load_ndarray(path_to_file):
+    try:
+        with open(path_to_file, 'rb') as f:
+            data = np.load(f)
+    except Exception as e:
+        raise e
+
+    return data
+
+def dump_ndjson(data, file):
+    try:
+        with open(file, 'w') as f:
+            for each in data:
+                f.write(json.dumps(each) + '\n')
+    except Exception as e:
+        raise e
+
+def load_ndjson(file, return_type='array'):
+    if return_type == 'array':
+        return load_ndjson_to_array(file)
+    elif return_type == 'dict':
+        return load_ndjson_to_dict(file)
+    else:
+        raise RuntimeError('Unknown return_type: %s' % return_type)
+
+def load_ndjson_to_array(file):
+    data = []
+    try:
+        with open(file, 'r') as f:
+            for line in f:
+                data.append(json.loads(line.strip()))
+    except Exception as e:
+        raise e
+    return data
+
+def load_ndjson_to_dict(file):
+    data = {}
+    try:
+        with open(file, 'r') as f:
+            for line in f:
+                data.update(json.loads(line.strip()))
+    except Exception as e:
+        raise e
+    return data
+
+def dump_json(data, file, indent=None):
+    try:
+        with open(file, 'w') as f:
+            json.dump(data, f, indent=indent)
+    except Exception as e:
+        raise e
+
+def load_json(file):
+    try:
+        with open(file, 'r') as f:
+            data = json.load(f)
+    except Exception as e:
+        raise e
+    return data
+
+
+########################################
+############## Checkpoint ##############
+########################################
 def load_checkpoint(checkpoint_dir: str, model: nn.Module, optim: optimizer.Optimizer) -> Tuple[int, int, float]:
-    """Loads training checkpoint.
-
-    :param checkpoint_path: path to checkpoint
-    :param model: model to update state
-    :param optim: optimizer to  update state
-    :return tuple of starting epoch id, starting step id, best checkpoint score
-    """
     if not os.path.exists(checkpoint_dir):
         raise ("File doesn't exist {}".format(checkpoint_dir))
     checkpoint_path = os.path.join(checkpoint_dir, 'checkpoint.tar') 
@@ -74,7 +150,6 @@ def load_checkpoint(checkpoint_dir: str, model: nn.Module, optim: optimizer.Opti
     
     best_score = checkpoint[_BEST_SCORE]
     return start_epoch_id, best_score
-
 
 def save_checkpoint(checkpoint_dir: str, model: nn.Module, optim: optimizer.Optimizer, epoch_id: int, best_score: float):
     if not os.path.exists(checkpoint_dir):

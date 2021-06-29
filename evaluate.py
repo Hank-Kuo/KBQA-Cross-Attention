@@ -2,7 +2,6 @@ import torch
 import model.data_loader as data_loader
 
 def evaluate(data, device, model, word2idx, entity2idx):
-    model.eval()
     answers = []
     data_gen = data_loader.data_generator(data=data, word2ix=word2idx, entity2idx=entity2idx)
     total_correct = 0
